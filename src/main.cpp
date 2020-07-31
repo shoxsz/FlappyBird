@@ -1,6 +1,7 @@
 #include <list>
 #include <ctime>
 #include <iostream>
+#include <cstring>
 
 #include <glad/glad.h>
 #define GLFW_INCLUDE_NONE
@@ -41,6 +42,10 @@ struct Player{
   float width, height;
   float animationStep;
   bool hit;
+
+  int points;
+
+  Hole target;
 };
 
 struct Quad{
@@ -74,6 +79,10 @@ public:
     if(bird){
       delete bird;
     }
+
+    if(numbers){
+      delete numbers;
+    }
   }
 
   bool loadTextures(){
@@ -97,6 +106,11 @@ public:
       return false;
     }
 
+    numbers = Texture2D::load("assets/numbers.png");
+    if(!numbers){
+      return false;
+    }
+
     loaded = true;
 
     return true;
@@ -106,6 +120,7 @@ public:
   Texture2D* base;
   Texture2D* pipe;
   Texture2D* bird;
+  Texture2D* numbers;
   bool loaded;
 };
 
@@ -115,6 +130,23 @@ inline float getMax(float a, float b){
 
 inline float getMin(float a, float b){
   return a < b ? a : b;
+}
+
+void findPlayerTarget(Player& player, const std::list<Hole>& holes){
+  for(auto& it = holes.begin(); it != holes.end(); ++it){
+    if(it->x > player.x){
+      player.target = *it;
+      break;
+    }
+  }
+}
+
+bool updatePlayerPoints(Player& player, const std::list<Hole>& holes){
+  if(player.x >= player.target.x){
+    player.points++;
+    return true;
+  }
+  return false;
 }
 
 void updatePlayerPosition(Player& player, float deltasec){
@@ -360,6 +392,46 @@ void renderPipes(const std::list<Hole>& holes, float playerX, Textures& textures
   glEnd();
 }
 
+void renderNumbers(Textures& textures, const std::string& numbers){
+  const float numberWidth = 2;
+  const float numberHeight = 3;
+
+  float width = numberWidth * numbers.size();
+  float startX = CANVAS_HALF_WIDTH - (width / 2);
+  float y = (CANVAS_HEIGHT * 0.9f) - (numberHeight / 2);
+
+  float texWidth = 1 / 10.0f;
+
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+  glTranslatef(-CANVAS_HALF_WIDTH, -CANVAS_HALF_HEIGHT, 0);
+
+  textures.numbers->bind();
+
+  glBegin(GL_QUADS);
+
+  for(unsigned int i = 0; i < numbers.size(); ++i){
+    char n = numbers.at(i);
+
+    float x = startX + (i * numberWidth);
+    float tx = (n - '0') * texWidth;
+
+    glTexCoord2f(tx, 1.0);
+    glVertex2f(x, y);
+
+    glTexCoord2f(tx + texWidth, 1.0);
+    glVertex2f(x + numberWidth, y);
+
+    glTexCoord2f(tx + texWidth, 0.0);
+    glVertex2f(x + numberWidth, y + numberHeight);
+
+    glTexCoord2f(tx, 0.0);
+    glVertex2f(x, y + numberHeight);
+  }
+
+  glEnd();
+}
+
 int initGL(){
   if(!gladLoadGL()){
     return 0;
@@ -378,7 +450,8 @@ int main(){
   std::list<Hole> holes;
   GameStates state = GameStates::PAUSED;
 
-  Player player = { CANVAS_HALF_WIDTH, CANVAS_HALF_HEIGHT, 4.0f, 0.0f, 0.0f, 2.0f, 2.0f * 0.7f, 0.0f, false };
+  Player player = { CANVAS_HALF_WIDTH, CANVAS_HALF_HEIGHT, 4.0f, 0.0f, 0.0f, 2.0f, 2.0f * 0.7f, 0.0f, false, 0 };
+  std::string pointsText = "0";
   float timer;
 
   bool pressed = false;
@@ -431,9 +504,14 @@ int main(){
         }else{
           pressed = false;
         }
-
-        updatePlayerPosition(player, delta);
+        
         updateHoles(player.x, holes);
+        findPlayerTarget(player, holes);
+        updatePlayerPosition(player, delta);
+        
+        if(updatePlayerPoints(player, holes)){
+          pointsText = std::to_string(player.points);
+        }
 
         if(!player.hit){
           player.hit = isPlayerHit(player, holes);
@@ -460,6 +538,7 @@ int main(){
     renderPipes(holes, player.x, textures);
     renderBird(player, textures, delta);
     renderBase(textures);
+    renderNumbers(textures, pointsText);
 
     gameWindow.swapBuffers();
     gameWindow.pollEvents();
