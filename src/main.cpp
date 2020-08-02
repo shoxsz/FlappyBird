@@ -52,6 +52,11 @@ struct Quad{
   float left, right, bottom, top;
 };
 
+struct Blink{
+  float blinkTime;
+  float blinkCount;
+};
+
 class Textures{
 public:
   Textures(const Textures& texture) = delete;
@@ -227,6 +232,12 @@ bool isPlayerHit(Player player, std::list<Hole>& holes){
   getHolePipes(*it, topPipe, bottomPipe);
   return testColision(player, topPipe) || testColision(player, bottomPipe);
   return false;
+}
+
+void updateBlink(Blink& blink, float deltasec){
+  if(blink.blinkCount < blink.blinkTime){
+    blink.blinkCount += deltasec;
+  }
 }
 
 bool isPlayerDead(Player player){
@@ -432,6 +443,36 @@ void renderNumbers(Textures& textures, const std::string& numbers){
   glEnd();
 }
 
+void renderBlink(Blink& blink){
+  if(blink.blinkCount >= blink.blinkTime){
+    return;
+  }
+
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+  glTranslatef(-CANVAS_HALF_WIDTH, -CANVAS_HALF_HEIGHT, 0);
+
+  float alpha = 1 - (blink.blinkCount / blink.blinkTime);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBegin(GL_QUADS);
+
+  glColor4f(1, 1, 1, alpha);
+  glVertex3f(0, 0, 0);
+  
+  glColor4f(1, 1, 1, alpha);
+  glVertex3f(CANVAS_WIDTH, 0, 0);
+  
+  glColor4f(1, 1, 1, alpha);
+  glVertex3f(CANVAS_WIDTH, CANVAS_HEIGHT, 0);
+  
+  glColor4f(1, 1, 1, alpha);
+  glVertex3f(0, CANVAS_HEIGHT, 0);
+
+  glEnd();
+
+  glColor3f(1, 1, 1);
+}
+
 int initGL(){
   if(!gladLoadGL()){
     return 0;
@@ -449,6 +490,8 @@ int main(){
   GLfloat* projectionMatrix;
   std::list<Hole> holes;
   GameStates state = GameStates::PAUSED;
+
+  Blink blink = { 0, 0 };
 
   Player player = { CANVAS_HALF_WIDTH, CANVAS_HALF_HEIGHT, 4.0f, 0.0f, 0.0f, 2.0f, 2.0f * 0.7f, 0.0f, false, 0 };
   std::string pointsText = "0";
@@ -482,6 +525,8 @@ int main(){
     float delta = currentTime - timer;
     timer = currentTime;
 
+    updateBlink(blink, delta);
+
     switch(state){
       case PAUSED:
       if(glfwGetMouseButton(gameWindow.window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS){
@@ -504,17 +549,22 @@ int main(){
         }else{
           pressed = false;
         }
-        
+
         updateHoles(player.x, holes);
         findPlayerTarget(player, holes);
         updatePlayerPosition(player, delta);
-        
+
         if(updatePlayerPoints(player, holes)){
           pointsText = std::to_string(player.points);
         }
 
         if(!player.hit){
           player.hit = isPlayerHit(player, holes);
+          if(player.hit){
+            player.impulseY = 0.0f;
+            blink.blinkCount = 0;
+            blink.blinkTime = 0.125f;
+          }
         }
 
         if(isPlayerDead(player)){
@@ -539,6 +589,7 @@ int main(){
     renderBird(player, textures, delta);
     renderBase(textures);
     renderNumbers(textures, pointsText);
+    renderBlink(blink);
 
     gameWindow.swapBuffers();
     gameWindow.pollEvents();
