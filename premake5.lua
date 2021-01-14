@@ -8,10 +8,11 @@ project "FlappyBird"
 	architecture "x64"
 	location "build/FlappyBird"
 	targetdir "bin/%{cfg.buildcfg}"
+	debugdir "run"
 
-	files { "src/**.hpp", "src/**.h", "src/**.cpp", "deps/lodepng-master/lodepng.cpp", "deps/glad/src/glad.c" }
+	files { "src/**.hpp", "src/**.h", "src/**.cpp", "deps/lodepng/lodepng.cpp", "deps/glad/src/glad.c" }
 
-	includedirs { "deps/glfw-3.3.2.bin.WIN64/include", "deps/lodepng-master", "deps/glad/include" }
-	libdirs { "deps/glfw-3.3.2.bin.WIN64/lib-vc2019" }
+	includedirs { "deps/glfw-3.3/include", "deps/lodepng", "deps/glad/include" }
+	libdirs { "deps/glfw-3.3/lib-vc2019" }
 
 	links{ "opengl32", "glfw3.lib" }

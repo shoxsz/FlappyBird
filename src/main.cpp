@@ -4,7 +4,6 @@
 #include <cstring>
 
 #include <glad/glad.h>
-#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include "app.hpp"
 #include "texture.hpp"
@@ -17,13 +16,16 @@
 #define CANVAS_HALF_HEIGHT (CANVAS_HEIGHT/2)
 
 #define PIPE_GAP (CANVAS_HALF_WIDTH)
-#define HOLE_GAP (6)
-#define PIPE_WIDTH (4)
+#define HOLE_GAP (6.0f)
+#define PIPE_WIDTH (4.0f)
 
-#define BASE_HEIGHT (4)
-#define MIN_PIPE_HEIGHT (4)
-#define GRAVITY (-9.8f * 2)
+#define BASE_HEIGHT (4.0f)
+#define MIN_PIPE_HEIGHT (4.0f)
+#define GRAVITY (-9.8f * 2.0f)
 #define PLAYER_MASS (5.0f)
+
+#define MAX_HOLE_Y (CANVAS_HEIGHT - MIN_PIPE_HEIGHT - (HOLE_GAP / 2))
+#define MIN_HOLE_Y (BASE_HEIGHT + MIN_PIPE_HEIGHT + (HOLE_GAP / 2))
 
 enum GameStates{
   PAUSED,
@@ -169,14 +171,11 @@ void updatePlayerPosition(Player& player, float deltasec){
 	}
 }
 
-void generateHoles(std::list<Hole>& holes, float playerX, int count){
-  float lastHoleX = holes.size() > 0 ? holes.back().x : playerX + CANVAS_WIDTH;
-
-  int maxHoleY = CANVAS_HEIGHT - MIN_PIPE_HEIGHT - (HOLE_GAP/2);
-  int minHoleY = BASE_HEIGHT + MIN_PIPE_HEIGHT + (HOLE_GAP/2);
+void generateHoles(std::list<Hole>& holes, float playerX, unsigned int count){
+  float lastHoleX = holes.size() > 0 ? holes.back().x : CANVAS_HALF_WIDTH;
 
   for(unsigned int i = 0; i < count; ++i){
-    float holeY = (rand() % (maxHoleY - minHoleY)) + minHoleY;
+    float holeY = (rand() % (int)(MAX_HOLE_Y - MIN_HOLE_Y)) + MIN_HOLE_Y;
     float holeX = lastHoleX + ((i + 1) * CANVAS_HALF_WIDTH);
 
     holes.push_back({ holeX, holeY });
@@ -190,7 +189,7 @@ void updateHoles(float playerX, std::list<Hole>& holes){
 
   while(!holes.empty()){
     const Hole& hole = holes.front();
-    if(playerX - hole.x >= CANVAS_HALF_WIDTH + PIPE_WIDTH){
+    if(playerX - hole.x >= CANVAS_HALF_WIDTH + (PIPE_WIDTH / 2.0f)){
       holes.pop_front();
     }else{
       break;
@@ -231,7 +230,6 @@ bool isPlayerHit(Player player, std::list<Hole>& holes){
 
   getHolePipes(*it, topPipe, bottomPipe);
   return testColision(player, topPipe) || testColision(player, bottomPipe);
-  return false;
 }
 
 void updateBlink(Blink& blink, float deltasec){
@@ -481,46 +479,49 @@ int initGL(){
   glEnable(GL_TEXTURE_2D);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+  return 1;
+
 }
 
-int main(){
-  GLFWApp app;
-  GameWindow gameWindow;
-  Textures textures;
-  GLfloat* projectionMatrix;
+bool initGame(GLFWApp* app, GameWindow* gameWindow, Textures* textures) {
+  
+  if(!app->init()){
+    return false;
+  }
+
+  if(!gameWindow->create(CANVAS_ASPECT_RATIO)){
+    return -false;
+  }
+
+  if(!initGL()){
+    return false;
+  }
+
+  if(!textures->loadTextures()){
+    return false;
+  }
+
+  return true;
+}
+
+void runGame(GameWindow* gameWindow, Textures& textures) {
+  
   std::list<Hole> holes;
-  GameStates state = GameStates::PAUSED;
+  GameStates state = PAUSED;
 
   Blink blink = { 0, 0 };
 
   Player player = { CANVAS_HALF_WIDTH, CANVAS_HALF_HEIGHT, 4.0f, 0.0f, 0.0f, 2.0f, 2.0f * 0.7f, 0.0f, false, 0 };
   std::string pointsText = "0";
-  float timer;
 
   bool pressed = false;
 
-  srand(time(nullptr));
-
-  if(!app.init()){
-    return -1;
-  }
-
-  if(!gameWindow.create(CANVAS_ASPECT_RATIO)){
-    return -1;
-  }
-
-  if(!initGL()){
-    return -1;
-  }
-
-  if(!textures.loadTextures()){
-    return -1;
-  }
-
-  projectionMatrix = orthoProjection(-CANVAS_HALF_WIDTH, CANVAS_HALF_WIDTH, -CANVAS_HALF_HEIGHT, CANVAS_HALF_HEIGHT, 1, -1);
+  GLfloat* projectionMatrix = orthoProjection(-CANVAS_HALF_WIDTH, CANVAS_HALF_WIDTH, -CANVAS_HALF_HEIGHT, CANVAS_HALF_HEIGHT, 1, -1);
   glClearColor(0, 0, 0, 1);
-  timer = glfwGetTime();
-  while(gameWindow.isAlive()){
+  float timer = glfwGetTime();
+
+  while(gameWindow->isAlive()){
     float currentTime = glfwGetTime();
     float delta = currentTime - timer;
     timer = currentTime;
@@ -529,17 +530,17 @@ int main(){
 
     switch(state){
       case PAUSED:
-      if(glfwGetMouseButton(gameWindow.window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS){
+      if(glfwGetMouseButton(gameWindow->window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS){
         state = GameStates::PLAYING;
       }
       isPlayerHit(player, holes);
       break;
       case PLAYING:{
-        if(glfwGetKey(gameWindow.window, GLFW_KEY_P) == GLFW_PRESS){
+        if(glfwGetKey(gameWindow->window, GLFW_KEY_P) == GLFW_PRESS){
           state = GameStates::PAUSED;
         }
 
-        int upState = glfwGetMouseButton(gameWindow.window, GLFW_MOUSE_BUTTON_1);
+        int upState = glfwGetMouseButton(gameWindow->window, GLFW_MOUSE_BUTTON_1);
         if(upState == GLFW_PRESS){
           if(!pressed && !player.hit){
             player.speedY = getMax(0.0f, player.speedY);
@@ -573,9 +574,14 @@ int main(){
       }
       break;
       case DEAD:
-      if(glfwGetMouseButton(gameWindow.window, GLFW_MOUSE_BUTTON_1) == GLFW_PRESS){
-        state = GameStates::PLAYING;
+      pointsText = "0";
+      if(glfwGetKey(gameWindow->window, GLFW_KEY_SPACE) == GLFW_PRESS){
+        blink = { 0, 0 };
+        player = { CANVAS_HALF_WIDTH, CANVAS_HALF_HEIGHT, 4.0f, 0.0f, 0.0f, 2.0f, 2.0f * 0.7f, 0.0f, false, 0 };
+        holes.clear();
+        state = GameStates::PAUSED;
       }
+
       break;
     }
 
@@ -591,11 +597,27 @@ int main(){
     renderNumbers(textures, pointsText);
     renderBlink(blink);
 
-    gameWindow.swapBuffers();
-    gameWindow.pollEvents();
+    gameWindow->swapBuffers();
+    gameWindow->pollEvents();
+  }
+}
+
+int main(){
+  GLFWApp* app = new GLFWApp();
+  GameWindow* gameWindow = new GameWindow();
+  Textures* textures = new Textures();
+
+  srand(time(nullptr));
+
+  bool init = initGame(app, gameWindow, textures);
+
+  if(init) {
+    runGame(gameWindow, *textures);
   }
 
-  delete projectionMatrix;
+  delete textures;
+  delete gameWindow;
+  delete app;
 
   return 0;
 }

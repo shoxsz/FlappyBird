@@ -38,17 +38,17 @@ public:
     this->height = height;
   }
 
-  float getWidth() const{
+  int getWidth() const{
     return width;
   }
 
-  float getHeight() const{
+  int getHeight() const{
     return height;
   }
 
 private:
   GLuint id;
-  float width, height;
+  int width, height;
 };
 
 #endif

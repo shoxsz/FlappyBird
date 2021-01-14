@@ -23,10 +23,6 @@ public:
     if(initialized){
       glfwTerminate();
     }
-
-    if(!error.empty()){
-      std::cout << error << std::endl;
-    }
   }
 
   void setError(const std::string& error){

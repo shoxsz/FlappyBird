@@ -16,7 +16,7 @@ bool GameWindow::create(float aspectRatio){
   }
 
   this->aspectRatio = aspectRatio;
-  glViewport(0, 0, 640 * aspectRatio, 640);
+  this->onResize(800, 640);
 
   glfwMakeContextCurrent(window);
   glfwSetWindowUserPointer(window, this);
